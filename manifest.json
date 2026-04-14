@@ -1,1 +1,23 @@
-{"name":"Preventivos Pro Claro AMX","short_name":"Preventivos","description":"Gestión de preventivos y tareas de celdas Claro AMX Argentina","start_url":"./","scope":"./","display":"standalone","orientation":"portrait-primary","background_color":"#0a0e14","theme_color":"#4f8ef7","lang":"es","icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},{"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}] }
+{
+  "name": "Preventivos Pro",
+  "short_name": "PrevenPro",
+  "description": "Gestión de Mantenimiento Preventivo Claro AMX",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0a0e14",
+  "theme_color": "#4f8ef7",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

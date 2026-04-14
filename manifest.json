@@ -2,7 +2,7 @@
   "name": "Preventivos Pro",
   "short_name": "PrevenPro",
   "description": "Gestión de Mantenimiento Preventivo Claro AMX",
-  "start_url": "./index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0a0e14",
   "theme_color": "#4f8ef7",

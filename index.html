@@ -158,6 +158,24 @@
         /* Missing Tasks Badge */
         .missing-badge { background:var(--yellow); color:#000; font-size:.6rem; font-weight:900; 
                          padding:2px 6px; border-radius:10px; margin-left:5px; cursor:pointer; }
+
+        /* Save Button */
+        .save-btn { background:var(--green); color:#fff; border:none; padding:12px 20px; border-radius:10px; 
+                    font-weight:800; cursor:pointer; margin-top:10px; width:100%; display:none; }
+        
+        .edit-input { background:rgba(255,255,255,0.05); border:1px solid var(--brd); color:#fff; 
+                      padding:4px 8px; border-radius:4px; font-size:.75rem; width:100px; outline:none; }
+
+        /* Alarms Checklist */
+        .alarm-check-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--brd); cursor:pointer; }
+        .alarm-check-row:hover { background:rgba(255,255,255,0.03); }
+        .alarm-check-row input { width:18px; height:18px; cursor:pointer; accent-color:var(--green); }
+        .alarm-info { flex:1; }
+        .alarm-info b { font-size:.85rem; color:var(--txt); display:block; }
+        .alarm-info small { font-size:.7rem; color:var(--dim); }
+        .alarm-badge-site { background:#3d0f0f; color:#ff6b6b; font-size:.7rem; font-weight:900; 
+                            padding:4px 10px; border-radius:6px; cursor:pointer; border:1px solid #ff6b6b; display:inline-flex; align-items:center; gap:5px; }
+        .alarm-badge-site.ok { background:var(--green); color:#fff; border-color:var(--green); }
     </style>
 </head>
 <body>
@@ -167,6 +185,7 @@
     <div class="pills">
         <div id="p-pill" class="pill">Excel ?</div>
         <div id="s-pill" class="pill">Sytex ?</div>
+        <div id="a-pill" class="pill">Alarms ?</div>
     </div>
 </header>
 
@@ -203,6 +222,10 @@
                 <h2 style="margin-bottom:.9rem">📂 ARCHIVOS</h2>
                 <label class="file-btn accent">📁 PREVENTIVOS.xlsx<input type="file" style="display:none" onchange="loadFile(this,'p')"></label>
                 <label class="file-btn">📊 SYTEX.xlsx<input type="file" style="display:none" onchange="loadFile(this,'s')"></label>
+                <label class="file-btn" style="border-style:dashed; border-color:var(--dim)">🚨 ALARMAS.csv<input type="file" style="display:none" onchange="loadAlarms(this)"></label>
+                
+                <button id="export-btn" class="save-btn" onclick="exportExcel()">📥 DESCARGAR EXCEL EDITADO</button>
+                <button onclick="clearStorage()" style="background:none; border:none; color:var(--red); font-size:.65rem; margin-top:15px; cursor:pointer; opacity:.5">🗑️ Borrar memoria del navegador</button>
             </div>
 
                 <div id="sc-list"><p style="font-size:.75rem;color:var(--dim)">Sin accesos guardados.</p></div>
@@ -226,7 +249,10 @@
 
             <div id="site-hdr" class="site-hdr">
                 <h3 id="s-id">--</h3>
-                <p id="s-meta" style="font-size:.75rem;color:var(--dim)"></p>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end">
+                    <p id="s-meta" style="font-size:.75rem;color:var(--dim)"></p>
+                    <div id="s-alarm-btn" onclick="openAlarmsModal()" class="alarm-badge-site" style="display:none">🚨 ALARMAS</div>
+                </div>
                 <div class="mini-bar-track"><div id="s-bar" class="mini-bar-fill"></div></div>
             </div>
 
@@ -249,6 +275,23 @@
         </div>
         <input type="text" id="m-filter" class="modal-search" placeholder="Filtrar por CellID, WO o sitio…">
         <div class="modal-body" id="m-body"></div>
+    </div>
+</div>
+
+<!-- MODAL ALARMAS -->
+<div id="modal-alarms" class="modal">
+    <div class="modal-box">
+        <div class="modal-head">
+            <div>
+                <h3 style="color:#ff6b6b;font-size:1.05rem">🚨 Verificación de Alarmas</h3>
+                <p id="ma-site" style="font-size:.72rem;color:var(--dim)"></p>
+            </div>
+            <button class="x-btn" onclick="closeM('alarms')">×</button>
+        </div>
+        <div class="modal-body" id="ma-body"></div>
+        <div style="padding:15px; border-top:1px solid var(--brd); text-align:center">
+            <button onclick="closeM('alarms')" style="background:var(--acc); color:#fff; border:none; padding:10px 30px; border-radius:10px; font-weight:700">LISTO</button>
+        </div>
     </div>
 </div>
 
@@ -299,9 +342,74 @@ const TCFG = {
 // ──────────────────────────────────────────────
 // STATE
 // ──────────────────────────────────────────────
-const DB = { p:[], s:{ wos:{}, seteo:{}, all:[] }, auditList:[], missing:[], sem: 1 };
+const DB = { 
+    p:[], 
+    s:{ wos:{}, seteo:{}, all:[] }, 
+    a:{}, 
+    aChecks: JSON.parse(localStorage.getItem('al_v1') || '{}'),
+    auditList:[], 
+    missing:[], 
+    sem: 1,
+    currentSite: null,
+    rawHeaders: [] // Para reconstruir el Excel al exportar
+};
 const QUARTERLY = ["ME00015", "ME00020", "ME00201", "ME00205"];
 let shortcuts = JSON.parse(localStorage.getItem('sc_v1') || '[]');
+
+// ──────────────────────────────────────────────
+// PERSISTENCE (IndexedDB)
+// ──────────────────────────────────────────────
+const DB_NAME = "PrevenWebDB";
+const STORE_NAME = "AppData";
+
+function initStorage() {
+    return new Promise((resolve) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME);
+        req.onsuccess = (e) => {
+            const idb = e.target.result;
+            const tx = idb.transaction(STORE_NAME, "readonly");
+            const store = tx.objectStore(STORE_NAME);
+            store.get("main_data").onsuccess = (ev) => {
+                const data = ev.target.result;
+                if (data) {
+                    DB.p = data.p || [];
+                    DB.s = data.s || { wos:{}, seteo:{}, all:[] };
+                    DB.a = data.a || {};
+                    DB.rawHeaders = data.rawHeaders || [];
+                    if (DB.p.length) setpill('p', 'Excel Recuperado');
+                    if (DB.s.all?.length) setpill('s', 'Sytex Recuperado');
+                    if (Object.keys(DB.a).length) setpill('a', 'Alarms Recuperado');
+                    renderAll();
+                    checkMissing();
+                    document.getElementById('export-btn').style.display = DB.p.length ? 'block' : 'none';
+                }
+                resolve();
+            };
+        };
+    });
+}
+
+function saveToStorage() {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onsuccess = (e) => {
+        const idb = e.target.result;
+        const tx = idb.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).put({
+            p: DB.p,
+            s: DB.s,
+            a: DB.a,
+            rawHeaders: DB.rawHeaders
+        }, "main_data");
+    };
+}
+
+function clearStorage() {
+    if(confirm("¿Borrar todos los datos cargados?")) {
+        const req = indexedDB.deleteDatabase(DB_NAME);
+        req.onsuccess = () => location.reload();
+    }
+}
 
 function normId(s) { return String(s||'').toUpperCase().replace(/^ME/,'').replace(/^0+/,''); }
 function normWO(w) { 
@@ -368,6 +476,46 @@ function getMonthFromVal(val) {
 // ──────────────────────────────────────────────
 // FILE LOADING
 // ──────────────────────────────────────────────
+async function loadAlarms(input) {
+    try {
+        const f = input.files[0]; if(!f) return;
+        const txt = await f.text();
+        // Intentar separar por punto y coma o coma según el CSV
+        const delimiter = txt.includes(';') ? ';' : ',';
+        const rows = txt.split('\n').map(r => r.split(delimiter));
+        const headers = rows[0].map(h => h.toUpperCase().replace(/["\r]/g,'').trim());
+        
+        const iSITE = headers.findIndex(h => h.includes("SITIO") || h.includes("SITE"));
+        const iTECH = headers.findIndex(h => h.includes("TECNOLOG") || h.includes("TECH"));
+        const iALM  = headers.findIndex(h => h.includes("ALARMA") || h.includes("NAME"));
+        const iPRT  = headers.findIndex(h => h.includes("PUERTO") || h.includes("PORT"));
+
+        DB.a = {};
+        rows.slice(1).forEach(r => {
+            if (r.length < 3) return;
+            const siteRaw = String(r[iSITE]||'').replace(/"/g,'').trim();
+            if (!siteRaw || siteRaw === "." || siteRaw === "SITIO") return;
+            
+            const digits = siteRaw.toUpperCase().replace(/^ME/,'').replace(/^0+/,'') || '0';
+            const site = `ME${digits.padStart(5, '0')}`;
+            const tech = String(r[iTECH]||'').replace(/"/g,'').trim();
+            const alm  = String(r[iALM]||'').replace(/"/g,'').trim();
+            const prt  = String(r[iPRT]||'').replace(/"/g,'').trim();
+            
+            if (!DB.a[site]) DB.a[site] = [];
+            DB.a[site].push({ tech, alm, prt, id: `${tech}_${alm}_${prt}` });
+        });
+        
+        setpill('a','Alarms OK');
+        saveToStorage();
+        toast(`Alarmas cargadas: ${f.name}`);
+        if (DB.currentSite) showSite(DB.currentSite);
+    } catch (err) {
+        console.error(err);
+        toast('Error cargando alarmas CSV');
+    }
+}
+
 async function loadFile(input, type) {
     try {
         const f = input.files[0]; if(!f) return;
@@ -377,6 +525,7 @@ async function loadFile(input, type) {
         const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1 });
 
         if(type === 'p') {
+            DB.rawHeaders = data[9]; // Fila de cabeceras en PREVENTIVOS.xlsx
             DB.p = data.slice(10).filter(r => r[1] || r[2]).map(r => ({
                 wo:  String(r[0]||'').trim(),
                 cid: String(r[1]||'').trim(),
@@ -384,9 +533,11 @@ async function loadFile(input, type) {
                 zf:  String(r[5]||'').trim(),
                 saa: String(r[6]||'').trim().toUpperCase(),
                 trm: String(r[7]||'').trim().toUpperCase(),
-                inf: r[8]
+                inf: r[8],
+                _raw: r // Guardamos la fila original para reconstruir
             }));
             setpill('p','Excel OK');
+            document.getElementById('export-btn').style.display = 'block';
         } else {
             DB.s = { wos:{}, seteo:{}, all:[] };
             const headers = data[0].map(h => String(h||'').toUpperCase());
@@ -400,7 +551,6 @@ async function loadFile(input, type) {
             const iAPR  = headers.findIndex(h => h.includes("APROBADO"));
             const iLNK  = headers.findIndex(h => h.includes("LINK") || h.includes("URL"));
 
-            // Si no encuentra FO por nombre, usar columna 0 como respaldo
             const idxFO = iFO !== -1 ? iFO : 0;
             const idxWO = iWO !== -1 ? iWO : 9;
             const idxCID = iCID !== -1 ? iCID : 6;
@@ -440,6 +590,7 @@ async function loadFile(input, type) {
             setpill('s','Sytex OK');
             checkMissing();
         }
+        saveToStorage();
         renderAll();
         toast(`Cargado: ${f.name}`);
     } catch (err) {
@@ -647,11 +798,28 @@ document.addEventListener('click', e => { if(!e.target.closest('.search-wrap')) 
 // SITE TASKS
 // ──────────────────────────────────────────────
 function showSite(cid) {
+    DB.currentSite = cid;
     const rows = DB.p.filter(r => r.cid === cid);
     if(!rows.length) { toast('Sin tareas para ese sitio'); return; }
 
     document.getElementById('site-hdr').style.display='block';
     document.getElementById('s-id').innerText = cid;
+
+    // Alertas/Alarms badge
+    const alBtn = document.getElementById('s-alarm-btn');
+    const digits = cid.replace(/^ME/,'').replace(/^0+/,'') || '0';
+    const siteNorm = `ME${digits.padStart(5, '0')}`;
+    const siteAlarms = DB.a[siteNorm] || [];
+    
+    if (siteAlarms.length > 0) {
+        const checks = DB.aChecks[siteNorm] || {};
+        const checkedCount = Object.values(checks).filter(v => v).length;
+        alBtn.innerText = `🚨 ${checkedCount}/${siteAlarms.length} ALARMAS`;
+        alBtn.classList.toggle('ok', checkedCount === siteAlarms.length);
+        alBtn.style.display = 'inline-flex';
+    } else {
+        alBtn.style.display = 'none';
+    }
 
     const cont = document.getElementById('task-list'); cont.innerHTML='';
     let done=0, total=0;
@@ -709,6 +877,14 @@ function renderCard(cont, r, field) {
             <div class="state-badge ${badgeCls}">${badge}</div>
             ${sInfo?.fo ? `<div style="font-size:.62rem;color:var(--acc);font-weight:800;cursor:pointer;margin-top:4px" onclick="window.open('${sInfo.lnk||'#'}','_blank')">${sInfo.fo}</div>` : ''}
             ${sInfo?.fecha ? `<div style="font-size:.6rem;color:var(--dim);margin-top:2px">${sInfo.fecha}</div>` : ''}
+            
+            <div style="margin-top:8px">
+                <select class="edit-input" onchange="updateTaskMonth('${r.wo}','${field}',this.value)">
+                    <option value="">MES...</option>
+                    ${MONTHS.map(m => `<option value="${m}" ${val===m?'selected':''}>${m}</option>`).join('')}
+                    <option value="—" ${val==='—'?'selected':''}>—</option>
+                </select>
+            </div>
         </div>
     `;
     cont.appendChild(div);
@@ -800,8 +976,47 @@ document.getElementById('m-filter').addEventListener('input', e => {
 });
 
 // ──────────────────────────────────────────────
-// SHORTCUTS
+// ALARMS MODAL
 // ──────────────────────────────────────────────
+function openAlarmsModal() {
+    const cid = DB.currentSite;
+    const digits = cid.replace(/^ME/,'').replace(/^0+/,'') || '0';
+    const siteNorm = `ME${digits.padStart(5, '0')}`;
+    const alms = DB.a[siteNorm] || [];
+    
+    document.getElementById('ma-site').innerText = `${cid} — ${alms.length} alarmas configuradas`;
+    const cont = document.getElementById('ma-body');
+    cont.innerHTML = '';
+    
+    const checks = DB.aChecks[siteNorm] || {};
+    
+    alms.forEach(a => {
+        const row = document.createElement('div');
+        row.className = 'alarm-check-row';
+        const isChecked = checks[a.id] || false;
+        
+        row.innerHTML = `
+            <input type="checkbox" ${isChecked ? 'checked' : ''}>
+            <div class="alarm-info">
+                <b>${a.alm}</b>
+                <small>${a.tech} | Puerto: ${a.prt}</small>
+            </div>
+        `;
+        
+        row.onclick = (e) => {
+            const cb = row.querySelector('input');
+            if (e.target !== cb) cb.checked = !cb.checked;
+            
+            if (!DB.aChecks[siteNorm]) DB.aChecks[siteNorm] = {};
+            DB.aChecks[siteNorm][a.id] = cb.checked;
+            localStorage.setItem('al_v1', JSON.stringify(DB.aChecks));
+            showSite(cid); // Actualizar badge
+        };
+        cont.appendChild(row);
+    });
+    
+    document.getElementById('modal-alarms').style.display = 'flex';
+}
 function renderShortcuts() {
     const cont = document.getElementById('sc-list');
     if(!shortcuts.length) { cont.innerHTML='<p style="font-size:.75rem;color:var(--dim)">Sin accesos guardados.</p>'; return; }
@@ -846,7 +1061,47 @@ function toast(m) {
     clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none', 2600);
 }
 
-// Init shortcuts panel
+// ──────────────────────────────────────────────
+// EDIT & EXPORT
+// ──────────────────────────────────────────────
+function updateTaskMonth(wo, field, newMonth) {
+    const row = DB.p.find(r => r.wo === wo);
+    if (!row) return;
+    
+    row[field] = newMonth;
+    // Actualizar también la fila original (_raw) para el Excel
+    // Columna 6 es Seteo A/A (index 6), Columna 7 es Terminado (index 7)
+    const idx = field === 'saa' ? 6 : 7;
+    row._raw[idx] = newMonth;
+    
+    saveToStorage();
+    renderAll();
+    toast(`Actualizado a ${newMonth || 'vacío'}`);
+}
+
+function exportExcel() {
+    if (!DB.p.length) return;
+    
+    // Reconstruir la matriz de datos para SheetJS
+    const output = [];
+    // Las primeras 9 filas del Excel original (instrucciones, etc.)
+    for(let i=0; i<9; i++) output.push([]); // Podríamos guardarlas también si fuera necesario
+    output.push(DB.rawHeaders);
+    
+    DB.p.forEach(r => {
+        output.push(r._raw);
+    });
+    
+    const ws = XLSX.utils.aoa_to_sheet(output);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "PREVENTIVOS");
+    
+    XLSX.writeFile(wb, "PREVENTIVOS_EDITADO.xlsx");
+    toast("Excel descargado. Reemplaza el original con este.");
+}
+
+// Init storage and load data
+initStorage();
 renderShortcuts();
 </script>
 </body>

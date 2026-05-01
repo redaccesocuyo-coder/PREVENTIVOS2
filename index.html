@@ -149,11 +149,11 @@
                           padding:8px 14px; cursor:pointer; font-weight:700; font-size:.8rem; }
 
         /* Semester Toggle */
-        .semester-toggle { display:flex; background:rgba(0,0,0,.3); border-radius:6px; padding:3px; }
-        .sem-btn { background:none; border:none; color:var(--dim); padding:4px 10px; font-size:.65rem; 
-                   font-weight:800; cursor:pointer; border-radius:4px; transition:.2s; }
-        .sem-btn.active { background:var(--acc); color:#fff; }
-        .v-line { width:1px; height:20px; background:var(--brd); margin:0 5px; }
+        .semester-toggle { display:flex; background:rgba(0,0,0,0.4); border-radius:6px; padding:3px; border:1px solid var(--brd); }
+        .sem-btn { background:none; border:none; color:var(--dim); padding:5px 12px; font-size:.7rem; 
+                   font-weight:800; cursor:pointer; border-radius:4px; transition:.2s; min-width:60px; }
+        .sem-btn.active { background:var(--acc); color:#fff; box-shadow:0 2px 8px rgba(79,142,247,0.4); }
+        .v-line { width:1px; height:22px; background:var(--brd); margin:0 8px; }
 
         /* Missing Tasks Badge */
         .missing-badge { background:var(--yellow); color:#000; font-size:.6rem; font-weight:900; 
@@ -304,7 +304,10 @@ const QUARTERLY = ["ME00015", "ME00020", "ME00201", "ME00205"];
 let shortcuts = JSON.parse(localStorage.getItem('sc_v1') || '[]');
 
 function normId(s) { return String(s||'').toUpperCase().replace(/^ME/,'').replace(/^0+/,''); }
-function normWO(w) { return String(w||'').toUpperCase().replace(/^WO/,'').replace(/^0+/,''); }
+function normWO(w) { 
+    // Normalización agresiva: quitar letras iniciales y ceros
+    return String(w||'').toUpperCase().replace(/^[A-Z]+/,'').replace(/^0+/,''); 
+}
 
 function setSem(s) {
     DB.sem = s;
@@ -386,17 +389,37 @@ async function loadFile(input, type) {
             setpill('p','Excel OK');
         } else {
             DB.s = { wos:{}, seteo:{}, all:[] };
+            const headers = data[0].map(h => String(h||'').toUpperCase());
+            
+            const iWO  = headers.findIndex(h => h.includes("WO") || h.includes("ORDEN"));
+            const iCID = headers.findIndex(h => h.includes("CELLID") || h.includes("ID SITIO") || h === "ID");
+            const iDESC = headers.findIndex(h => h.includes("DESC") || h.includes("TAREA"));
+            const iEST  = headers.findIndex(h => h.includes("ESTADO"));
+            const iFO   = headers.findIndex(h => h.includes("FORM") || h.includes("NUMERO"));
+            const iENV  = headers.findIndex(h => h.includes("ENVIADO"));
+            const iAPR  = headers.findIndex(h => h.includes("APROBADO"));
+            const iLNK  = headers.findIndex(h => h.includes("LINK") || h.includes("URL"));
+
+            // Si no encuentra FO por nombre, usar columna 0 como respaldo
+            const idxFO = iFO !== -1 ? iFO : 0;
+            const idxWO = iWO !== -1 ? iWO : 9;
+            const idxCID = iCID !== -1 ? iCID : 6;
+            const idxEST = iEST !== -1 ? iEST : 10;
+            const idxDESC = iDESC !== -1 ? iDESC : 2;
+
             data.slice(1).forEach(r => {
-                if (!r || r.length < 11) return;
-                const wo  = String(r[9]||'').trim();
-                const cid = String(r[6]||'').trim();
-                const desc = String(r[2]||'').toUpperCase();
-                const raw = String(r[10]||'').toUpperCase();
-                const env = r[23];
-                const apr = r[33];
+                if (!r || r.length < 5) return;
+                const wo  = String(r[idxWO]||'').trim();
+                const cid = String(r[idxCID]||'').trim();
+                const desc = String(r[idxDESC]||'').toUpperCase();
+                const raw = String(r[idxEST]||'').toUpperCase();
+                
+                const env = iENV !== -1 ? r[iENV] : r[23];
+                const apr = iAPR !== -1 ? r[iAPR] : r[33];
+                
                 const est = (env && (raw==='ABIERTO'||raw==='EN PROCESO'||raw==='')) ? 'ENVIADO' : raw;
-                const fo  = String(r[0]||'').trim();
-                const lnk = String(r[36]||'').trim();
+                const fo  = String(r[idxFO]||'').trim();
+                const lnk = iLNK !== -1 ? String(r[iLNK]||'').trim() : String(r[36]||'').trim();
                 
                 const info = { 
                     wo, cid, desc,
@@ -410,7 +433,6 @@ async function loadFile(input, type) {
                 if(wo) DB.s.wos[normWO(wo)] = info;
                 if(cid && (desc.includes('SETEO'))) DB.s.seteo[cid] = info;
                 
-                // Guardar para comparación de faltantes
                 if (desc.includes('MANT') || desc.includes('BATER') || desc.includes('TRIM')) {
                     DB.s.all.push(info);
                 }
@@ -706,10 +728,12 @@ function labelFor(sit, cid) {
     const cidNorm = `ME${normId(cid).padStart(5, '0')}`;
     
     if(s.includes('interno')) {
+        // Para sitios trimestrales, mostrar la descripción del Excel (ej: "2° Semestre")
         if (QUARTERLY.includes(cidNorm)) {
-            // Extraer nombre específico del sitio si tiene el formato "SITIO - DESCRIPCION"
-            if (sit.includes(' - ')) return sit.split(' - ')[1].trim();
-            return '🔧 P. Interno';
+            if (sit.includes(' - ')) {
+                const parts = sit.split(' - ');
+                return '🔧 ' + parts[parts.length - 1].trim();
+            }
         }
         return '🔧 P. Interno';
     }

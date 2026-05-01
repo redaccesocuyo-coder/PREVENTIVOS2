@@ -5,13 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Preventivos Pro | Claro AMX</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" href="icon-192.png">
-    <link rel="apple-touch-icon" href="icon-192.png">
-    <meta name="theme-color" content="#4f8ef7">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="PrevenPro">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="theme-color" content="#0a0e14">
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -152,10 +148,16 @@
         .sc-form button { background:var(--acc); color:#fff; border:none; border-radius:7px;
                           padding:8px 14px; cursor:pointer; font-weight:700; font-size:.8rem; }
 
-        /* Toast */
-        #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-                 background:var(--acc); color:#fff; padding:9px 22px; border-radius:20px;
-                 font-size:.8rem; display:none; z-index:3000; box-shadow:0 8px 25px rgba(0,0,0,.5); }
+        /* Semester Toggle */
+        .semester-toggle { display:flex; background:rgba(0,0,0,.3); border-radius:6px; padding:3px; }
+        .sem-btn { background:none; border:none; color:var(--dim); padding:4px 10px; font-size:.65rem; 
+                   font-weight:800; cursor:pointer; border-radius:4px; transition:.2s; }
+        .sem-btn.active { background:var(--acc); color:#fff; }
+        .v-line { width:1px; height:20px; background:var(--brd); margin:0 5px; }
+
+        /* Missing Tasks Badge */
+        .missing-badge { background:var(--yellow); color:#000; font-size:.6rem; font-weight:900; 
+                         padding:2px 6px; border-radius:10px; margin-left:5px; cursor:pointer; }
     </style>
 </head>
 <body>
@@ -174,6 +176,11 @@
         <div class="card-hdr">
             <h2>📊 TABLA DE PROGRESO &nbsp;<small style="font-size:.65rem;color:var(--dim)">(Haz clic en un número para auditar)</small></h2>
             <div class="prog-box">
+                <div class="semester-toggle">
+                    <button id="btn-sem1" class="sem-btn active" onclick="setSem(1)">1º SEM</button>
+                    <button id="btn-sem2" class="sem-btn" onclick="setSem(2)">2º SEM</button>
+                </div>
+                <div class="v-line"></div>
                 <span style="font-size:.65rem;font-weight:800;color:var(--dim)">PROGRESO:</span>
                 <span id="gpct" class="prog-val">0%</span>
                 <div class="bar-track"><div id="gbar" class="bar-fill"></div></div>
@@ -198,12 +205,15 @@
                 <label class="file-btn">📊 SYTEX.xlsx<input type="file" style="display:none" onchange="loadFile(this,'s')"></label>
             </div>
 
-            <div class="card">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
-                    <h2>🔗 ACCESOS DIRECTOS</h2>
-                    <button onclick="openScModal()" style="background:var(--acc);border:none;color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:.7rem;font-weight:700">+ Agregar</button>
-                </div>
                 <div id="sc-list"><p style="font-size:.75rem;color:var(--dim)">Sin accesos guardados.</p></div>
+            </div>
+
+            <div id="missing-card" class="card" style="display:none; border-color:var(--yellow)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
+                    <h2 style="color:var(--yellow)">⚠️ TAREAS NUEVAS (SYTEX)</h2>
+                </div>
+                <p style="font-size:.7rem; color:var(--dim); margin-bottom:1rem">Estas tareas están en Sytex pero no en tu Excel.</p>
+                <div id="missing-list"></div>
             </div>
         </aside>
 
@@ -265,12 +275,12 @@
 <div id="toast"></div>
 
 <script>
-// ── PWA: registro del Service Worker ──
+// Registrar Service Worker para habilitar PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-            .then(r => console.log('[PWA] SW registrado:', r.scope))
-            .catch(e => console.warn('[PWA] SW error:', e));
+            .then(reg => console.log('SW registrado', reg))
+            .catch(err => console.log('Error SW', err));
     });
 }
 
@@ -289,8 +299,19 @@ const TCFG = {
 // ──────────────────────────────────────────────
 // STATE
 // ──────────────────────────────────────────────
-const DB = { p:[], s:{ wos:{}, seteo:{} }, auditList:[] };
+const DB = { p:[], s:{ wos:{}, seteo:{}, all:[] }, auditList:[], missing:[], sem: 1 };
+const QUARTERLY = ["ME00015", "ME00020", "ME00201", "ME00205"];
 let shortcuts = JSON.parse(localStorage.getItem('sc_v1') || '[]');
+
+function normId(s) { return String(s||'').toUpperCase().replace(/^ME/,'').replace(/^0+/,''); }
+function normWO(w) { return String(w||'').toUpperCase().replace(/^WO/,'').replace(/^0+/,''); }
+
+function setSem(s) {
+    DB.sem = s;
+    document.getElementById('btn-sem1').classList.toggle('active', s === 1);
+    document.getElementById('btn-sem2').classList.toggle('active', s === 2);
+    renderAll();
+}
 
 function getEffectiveMonth(r, type) {
     const s = r.sit.toLowerCase();
@@ -301,7 +322,7 @@ function getEffectiveMonth(r, type) {
     if (MONTHS.includes(val)) return val;
     
     if (!isManual) {
-        const sInfo = isS ? DB.s.seteo[r.cid] : DB.s.wos[r.wo];
+        const sInfo = isS ? DB.s.seteo[r.cid] : DB.s.wos[normWO(r.wo)];
         if (sInfo && (sInfo.est === 'ENVIADO' || sInfo.est === 'APROBADO')) {
             return sInfo.mesEnv || 'ENERO';
         }
@@ -364,7 +385,7 @@ async function loadFile(input, type) {
             }));
             setpill('p','Excel OK');
         } else {
-            DB.s = { wos:{}, seteo:{} };
+            DB.s = { wos:{}, seteo:{}, all:[] };
             data.slice(1).forEach(r => {
                 if (!r || r.length < 11) return;
                 const wo  = String(r[9]||'').trim();
@@ -378,6 +399,7 @@ async function loadFile(input, type) {
                 const lnk = String(r[36]||'').trim();
                 
                 const info = { 
+                    wo, cid, desc,
                     est, 
                     fo, 
                     lnk, 
@@ -385,10 +407,16 @@ async function loadFile(input, type) {
                     fecha: formatDate(apr || env)
                 };
                 
-                if(wo) DB.s.wos[wo] = info;
+                if(wo) DB.s.wos[normWO(wo)] = info;
                 if(cid && (desc.includes('SETEO'))) DB.s.seteo[cid] = info;
+                
+                // Guardar para comparación de faltantes
+                if (desc.includes('MANT') || desc.includes('BATER') || desc.includes('TRIM')) {
+                    DB.s.all.push(info);
+                }
             });
             setpill('s','Sytex OK');
+            checkMissing();
         }
         renderAll();
         toast(`Cargado: ${f.name}`);
@@ -438,13 +466,23 @@ function renderAll() {
     });
 
     const body = document.getElementById('sum-body'); body.innerHTML='';
+    const header = document.querySelector('.tbl thead tr');
+    const startIdx = (DB.sem - 1) * 6;
+    const semesterMonths = MONTHS.slice(startIdx, startIdx + 6);
+    
+    // Update headers
+    let headHtml = '<th>TIPO</th>';
+    semesterMonths.forEach(m => headHtml += `<th>${m.substring(0,3)}</th>`);
+    headHtml += '<th>TOTAL</th><th>HECHO</th><th>RESTA</th>';
+    header.innerHTML = headHtml;
+
     let gT=0, gH=0;
 
     for(const [k,d] of Object.entries(sum)) {
         const tr = document.createElement('tr'); let rH=0;
         let h = `<td>${TCFG[k].lbl}</td>`;
-        for(let i=0;i<6;i++) {
-            const m = MONTHS[i]; const list = d.m[m]||[];
+        for(let i=0; i<6; i++) {
+            const m = semesterMonths[i]; const list = d.m[m]||[];
             h += list.length
                 ? `<td class="clickable" onclick="openAudit('${k}','${m}')">${list.length}</td>`
                 : `<td style="color:var(--dim)">—</td>`;
@@ -456,10 +494,10 @@ function renderAll() {
     }
     const tr2=document.createElement('tr'); tr2.className='tot-row';
     let fh=`<td>TOTAL</td>`;
-    // recalculate totals per month
+    
     const monTot = Array(6).fill(0);
     for(const d of Object.values(sum)) {
-        for(let i=0;i<6;i++) monTot[i] += (d.m[MONTHS[i]]||[]).length;
+        for(let i=0; i<6; i++) monTot[i] += (d.m[semesterMonths[i]]||[]).length;
     }
     monTot.forEach(v => fh+=`<td>${v||'—'}</td>`);
     fh+=`<td>${gT}</td><td>${gH}</td><td>${gT-gH}</td>`;
@@ -476,7 +514,32 @@ function renderAll() {
 const qEl  = document.getElementById('q');
 const ddEl = document.getElementById('dropdown');
 
-function normId(s) { return s.toUpperCase().replace(/^ME/,'').replace(/^0+/,''); }
+function normId(s) { return String(s||'').toUpperCase().replace(/^ME/,'').replace(/^0+/,''); }
+function normWO(w) { return String(w||'').toUpperCase().replace(/^WO/,'').replace(/^0+/,''); }
+
+function checkMissing() {
+    if (!DB.p.length || !DB.s.all.length) return;
+    const excelWOs = new Set(DB.p.map(r => normWO(r.wo)));
+    DB.missing = DB.s.all.filter(s => s.wo && !excelWOs.has(normWO(s.wo)));
+    
+    const card = document.getElementById('missing-card');
+    const list = document.getElementById('missing-list');
+    
+    if (DB.missing.length > 0) {
+        card.style.display = 'block';
+        list.innerHTML = DB.missing.slice(0, 10).map(m => `
+            <div class="shortcut-item" style="border-left: 3px solid var(--yellow)">
+                <div style="flex:1">
+                    <b style="font-size:.8rem">${m.cid}</b><br>
+                    <small style="font-size:.65rem; color:var(--dim)">WO: ${m.wo} | ${m.est}</small>
+                </div>
+                <button onclick="qEl.value='${m.cid}'; showSite('${m.cid}')" style="background:var(--yellow); color:#000; border:none; padding:4px 8px; border-radius:4px; font-size:.6rem; font-weight:900; cursor:pointer">VER</button>
+            </div>
+        `).join('') + (DB.missing.length > 10 ? `<p style="font-size:.6rem; text-align:center; color:var(--dim)">+ ${DB.missing.length-10} más...</p>` : '');
+    } else {
+        card.style.display = 'none';
+    }
+}
 
 qEl.addEventListener('input', () => {
     const raw = qEl.value.trim();
@@ -590,7 +653,7 @@ function renderCard(cont, r, field) {
     // Tareas manuales (Alarmas/Inventario) vs Tareas de Sytex
     const s = r.sit.toLowerCase();
     const isManual = s.includes('alarma') || s.includes('inventario');
-    const sInfo = (isManual) ? null : (isS ? DB.s.seteo[r.cid] : DB.s.wos[r.wo]);
+    const sInfo = (isManual) ? null : (isS ? DB.s.seteo[r.cid] : DB.s.wos[normWO(r.wo)]);
 
     let cls='t-pend', badge='PENDIENTE', badgeCls='sb-pend';
     let isVirtualOk = false;
@@ -607,7 +670,7 @@ function renderCard(cont, r, field) {
         cls='t-done'; badge=val; badgeCls='sb-ok';
     }
 
-    const lbl = isS ? '❄️ Seteo A/A' : labelFor(r.sit);
+    const lbl = isS ? '❄️ Seteo A/A' : labelFor(r.sit, r.cid);
     const div = document.createElement('div'); div.className=`task-card ${cls}`;
 
     // WO copy logic
@@ -638,9 +701,18 @@ function copyWO(el, wo) {
     });
 }
 
-function labelFor(sit) {
+function labelFor(sit, cid) {
     const s = sit.toLowerCase();
-    if(s.includes('interno')) return '🔧 P. Interno';
+    const cidNorm = `ME${normId(cid).padStart(5, '0')}`;
+    
+    if(s.includes('interno')) {
+        if (QUARTERLY.includes(cidNorm)) {
+            // Extraer nombre específico del sitio si tiene el formato "SITIO - DESCRIPCION"
+            if (sit.includes(' - ')) return sit.split(' - ')[1].trim();
+            return '🔧 P. Interno';
+        }
+        return '🔧 P. Interno';
+    }
     if(s.includes('alarma'))  return '🚨 Alarmas';
     if(s.includes('inventario')) return '📦 Inventario';
     return '🔋 Test Bat.';

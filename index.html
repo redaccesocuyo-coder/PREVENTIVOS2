@@ -73,9 +73,10 @@
 
         /* ── SEARCH ── */
         .search-wrap { position:relative; margin-bottom:1rem; }
-        .search-inp { width:100%; background:#131824; border:1.5px solid var(--brd); border-radius:11px;
-                      padding:1rem; color:#fff; font-size:1rem; outline:none; }
-        .search-inp:focus { border-color:var(--acc); }
+        .search-inp { width:100%; background:#ffffff; border:1.5px solid var(--brd); border-radius:11px;
+                      padding:1rem; color:#000000; font-size:1rem; font-weight:900; outline:none; }
+        .search-inp::placeholder { color:#000000; font-weight:900; opacity:1; }
+        .search-inp:focus { border-color:var(--acc); box-shadow: 0 0 8px rgba(79,142,247,0.3); }
         .dropdown { position:absolute; top:calc(100%+4px); left:0; right:0; background:var(--hdr);
                     border:1px solid var(--brd); border-radius:10px; display:none; z-index:200;
                     max-height:230px; overflow-y:auto; box-shadow:0 12px 30px rgba(0,0,0,.5); }
@@ -176,16 +177,39 @@
         .alarm-badge-site { background:#3d0f0f; color:#ff6b6b; font-size:.7rem; font-weight:900; 
                             padding:4px 10px; border-radius:6px; cursor:pointer; border:1px solid #ff6b6b; display:inline-flex; align-items:center; gap:5px; }
         .alarm-badge-site.ok { background:var(--green); color:#fff; border-color:var(--green); }
+
+        /* CATEGORIA BADGE */
+        .cat-badge { font-size:1.8rem; font-weight:900; background:#8b0000; color:#fff;
+                     padding:2px 14px; border-radius:8px; line-height:1; display:none; }
+
+        /* ABM BUTTON */
+        .abm-btn { background:rgba(79,142,247,.12); color:var(--acc); border:1px solid rgba(79,142,247,.3);
+                   padding:5px 14px; border-radius:7px; font-size:.72rem; font-weight:800; cursor:pointer;
+                   display:none; transition:.15s; }
+        .abm-btn:hover { background:rgba(79,142,247,.25); }
+
+        /* ABM MODAL */
+        .abm-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+        .abm-table th { background:rgba(79,142,247,.1); color:var(--acc); padding:9px 12px; text-align:left; }
+        .abm-table td { padding:9px 12px; border-bottom:1px solid rgba(255,255,255,.04); color:var(--txt); }
+        .abm-table tr:hover td { background:rgba(255,255,255,.03); }
+        .abm-form label { font-size:.72rem; color:var(--dim); display:block; margin-bottom:4px; }
+        .abm-form input, .abm-form select { width:100%; background:rgba(255,255,255,.05); border:1px solid var(--brd);
+                           border-radius:7px; color:#fff; padding:9px; outline:none; font-size:.83rem; margin-bottom:14px; }
+        .abm-form input:focus, .abm-form select:focus { border-color:var(--acc); }
+        .gest-check { display:flex; align-items:center; gap:10px; margin-bottom:16px; cursor:pointer; }
+        .gest-check input { width:18px; height:18px; accent-color:var(--green); flex-shrink:0; cursor:pointer; }
     </style>
 </head>
 <body>
 
 <header>
     <div class="brand">📋 PREVENTIVOS PRO</div>
-    <div class="pills">
+    <div class="pills" style="display:none">
         <div id="p-pill" class="pill">Excel ?</div>
         <div id="s-pill" class="pill">Sytex ?</div>
         <div id="a-pill" class="pill">Alarms ?</div>
+        <div id="g-pill" class="pill">Gestiones ?</div>
     </div>
 </header>
 
@@ -218,16 +242,37 @@
     <div class="grid">
         <!-- SIDEBAR -->
         <aside>
-            <div class="card">
-                <h2 style="margin-bottom:.9rem">📂 ARCHIVOS</h2>
-                <label class="file-btn accent">📁 PREVENTIVOS.xlsx<input type="file" style="display:none" onchange="loadFile(this,'p')"></label>
-                <label class="file-btn">📊 SYTEX.xlsx<input type="file" style="display:none" onchange="loadFile(this,'s')"></label>
-                <label class="file-btn" style="border-style:dashed; border-color:var(--dim)">🚨 ALARMAS.csv<input type="file" style="display:none" onchange="loadAlarms(this)"></label>
+            <div class="card" style="padding: 12px 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h2 style="font-size:.8rem; margin:0; color:var(--dim); display:flex; align-items:center; gap:6px">📂 ARCHIVOS DE DATOS</h2>
+                    <button onclick="clearStorage()" title="Borrar memoria del navegador" style="background:none; border:none; color:var(--red); font-size:.85rem; cursor:pointer; opacity:.6; padding:0; transition:.2s">🗑️</button>
+                </div>
                 
-                <button id="export-btn" class="save-btn" onclick="exportExcel()">📥 DESCARGAR EXCEL EDITADO</button>
-                <button onclick="clearStorage()" style="background:none; border:none; color:var(--red); font-size:.65rem; margin-top:15px; cursor:pointer; opacity:.5">🗑️ Borrar memoria del navegador</button>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                    <label id="lbl-p" class="file-btn accent" style="padding: 8px 4px; font-size: .68rem; margin:0">
+                        <span id="txt-p">📁 PREVENTIVOS</span><input type="file" style="display:none" onchange="loadFile(this,'p')">
+                    </label>
+                    <label id="lbl-s" class="file-btn" style="padding: 8px 4px; font-size: .68rem; margin:0">
+                        <span id="txt-s">📊 SYTEX</span><input type="file" style="display:none" onchange="loadFile(this,'s')">
+                    </label>
+                    <label id="lbl-a" class="file-btn" style="border-style:dashed; border-color:var(--dim); padding: 8px 4px; font-size: .68rem; margin:0">
+                        <span id="txt-a">🚨 ALARMAS</span><input type="file" style="display:none" onchange="loadAlarms(this)">
+                    </label>
+                    <label id="lbl-g" class="file-btn" style="border-style:dashed; border-color:#7a1a1a; color:#ff6b6b; padding: 8px 4px; font-size: .68rem; margin:0" title="Para mostrar categoría A/B/C del sitio y gestión de equipos ABM">
+                        <span id="txt-g">🗂️ GESTIONES</span><input type="file" style="display:none" onchange="loadGestiones(this)">
+                    </label>
+                </div>
+                
+                <button id="kibana-btn" class="file-btn accent" onclick="fetchKibana()" style="width:100%; margin-bottom:10px; background:rgba(79,142,247,0.1); border-style:solid; font-weight:800">📡 KIBANA LIVE (TIEMPO REAL)</button>
+                <button id="export-btn" class="save-btn" onclick="exportExcel()" style="padding: 9px; font-size: .75rem; margin:0; border-radius:8px">📥 DESCARGAR EXCEL EDITADO</button>
             </div>
 
+            <!-- Accesos Directos Panel -->
+            <div class="card" style="padding: 12px 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h2 style="font-size:.8rem; margin:0; color:var(--dim); display:flex; align-items:center; gap:6px">🔗 ACCESOS DIRECTOS</h2>
+                    <button onclick="openScModal()" title="Nuevo acceso directo" style="background:var(--acc); border:none; color:#fff; border-radius:4px; padding:4px 10px; font-size:.85rem; font-weight:800; cursor:pointer; transition:.2s">➕</button>
+                </div>
                 <div id="sc-list"><p style="font-size:.75rem;color:var(--dim)">Sin accesos guardados.</p></div>
             </div>
 
@@ -248,7 +293,11 @@
             </div>
 
             <div id="site-hdr" class="site-hdr">
-                <h3 id="s-id">--</h3>
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:6px">
+                    <h3 id="s-id" style="margin:0">--</h3>
+                    <span id="s-cat-badge" class="cat-badge"></span>
+                    <button id="s-abm-btn" class="abm-btn" onclick="openAbmModal()">📋 ABM</button>
+                </div>
                 <div style="display:flex; justify-content:space-between; align-items:flex-end">
                     <p id="s-meta" style="font-size:.75rem;color:var(--dim)"></p>
                     <div id="s-alarm-btn" onclick="openAlarmsModal()" class="alarm-badge-site" style="display:none">🚨 ALARMAS</div>
@@ -280,17 +329,42 @@
 
 <!-- MODAL ALARMAS -->
 <div id="modal-alarms" class="modal">
-    <div class="modal-box">
+    <div class="modal-box" style="max-width:1000px">
         <div class="modal-head">
             <div>
-                <h3 style="color:#ff6b6b;font-size:1.05rem">🚨 Verificación de Alarmas</h3>
+                <h3 id="ma-title" style="color:#ff6b6b;font-size:1.05rem">🚨 Alarmas Activas (Kibana)</h3>
                 <p id="ma-site" style="font-size:.72rem;color:var(--dim)"></p>
             </div>
-            <button class="x-btn" onclick="closeM('alarms')">×</button>
+            <div style="display:flex; gap:10px; align-items:center">
+                <input type="text" id="ma-search" placeholder="Filtrar por Sitio, Alarma..." 
+                       style="background:rgba(255,255,255,0.05); border:1px solid var(--brd); border-radius:6px; color:#fff; padding:6px 12px; font-size:.8rem; outline:none; width:180px">
+                <button class="x-btn" onclick="closeM('alarms')">×</button>
+            </div>
         </div>
-        <div class="modal-body" id="ma-body"></div>
-        <div style="padding:15px; border-top:1px solid var(--brd); text-align:center">
-            <button onclick="closeM('alarms')" style="background:var(--acc); color:#fff; border:none; padding:10px 30px; border-radius:10px; font-weight:700">LISTO</button>
+        
+        <!-- Zona de pegado manual si falla el fetch -->
+        <div id="ma-manual-zone" style="display:none; padding:10px 20px; background:rgba(231,76,60,0.1); border-bottom:1px solid var(--red)">
+            <p style="font-size:.7rem; color:var(--red); margin-bottom:5px">⚠️ Bloqueo de conexión (CORS). Pega el JSON de Kibana aquí para procesar:</p>
+            <div style="display:flex; gap:10px">
+                <input type="text" id="ma-json-input" placeholder='Pega el contenido de "hits.hits" o el JSON completo...' 
+                       style="flex:1; background:rgba(0,0,0,0.3); border:1px solid var(--red); color:#fff; padding:5px 10px; font-size:.7rem; border-radius:4px">
+                <button onclick="processManualJson()" style="background:var(--red); color:#fff; border:none; border-radius:4px; padding:0 15px; font-size:.7rem; font-weight:800; cursor:pointer">PROCESAR</button>
+            </div>
+        </div>
+
+        <!-- Header de tabla para ordenamiento -->
+        <div id="ma-hdr" style="display:grid; grid-template-columns: 100px 120px 100px 90px 1fr; background:var(--hdr); padding:10px 20px; font-size:.7rem; font-weight:800; color:var(--acc); border-bottom:1px solid var(--brd)">
+            <div style="cursor:pointer" onclick="sortAlarms('cat')">TIPO <span id="sort-cat"></span></div>
+            <div style="cursor:pointer" onclick="sortAlarms('site')">SITIO <span id="sort-site"></span></div>
+            <div style="cursor:pointer" onclick="sortAlarms('time')">HORA <span id="sort-time"></span></div>
+            <div style="cursor:pointer" onclick="sortAlarms('lat')">LATENCIA <span id="sort-lat"></span></div>
+            <div>DESCRIPCIÓN DE LA ALARMA</div>
+        </div>
+
+        <div class="modal-body" id="ma-body" style="background:#0a0e14; min-height:300px"></div>
+        <div style="padding:15px; border-top:1px solid var(--brd); display:flex; justify-content:space-between; align-items:center; background:var(--hdr)">
+            <small id="ma-status" style="color:var(--dim); font-size:.7rem"></small>
+            <button onclick="closeM('alarms')" style="background:var(--acc); color:#fff; border:none; padding:8px 25px; border-radius:8px; font-weight:700; cursor:pointer">CERRAR</button>
         </div>
     </div>
 </div>
@@ -314,6 +388,62 @@
         </div>
     </div>
 </div>
+
+<!-- MODAL ABM EQUIPOS -->
+<div id="modal-abm" class="modal">
+    <div class="modal-box" style="max-width:860px">
+        <div class="modal-head">
+            <div>
+                <h3 id="abm-title" style="color:var(--acc);font-size:1.05rem">📋 Gestión de Equipos</h3>
+                <p id="abm-sub" style="font-size:.72rem;color:var(--dim)">Equipos registrados para este sitio</p>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center">
+                <button id="btn-export-gest" onclick="exportGestiones()" style="background:var(--acc);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:.8rem">📥 Exportar Gestiones</button>
+                <button onclick="openAddEquipoDialog()" style="background:var(--green);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:.8rem">➕ Agregar Equipo</button>
+                <button class="x-btn" onclick="closeM('abm')">×</button>
+            </div>
+        </div>
+        <div class="modal-body" style="padding:1rem">
+            <table class="abm-table">
+                <thead><tr><th>CAT. EQUIPO</th><th>MODELO</th><th>ETIQUETA</th><th>IP / GESTIÓN</th><th>ESTADO</th></tr></thead>
+                <tbody id="abm-body"></tbody>
+            </table>
+            <p id="abm-empty" style="text-align:center;padding:2rem;color:var(--dim);display:none">No hay equipos registrados para este sitio.</p>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL AGREGAR EQUIPO -->
+<div id="modal-addequipo" class="modal">
+    <div class="modal-box" style="max-width:480px">
+        <div class="modal-head">
+            <h3 style="color:var(--green);font-size:1.05rem">➕ Nuevo Equipo</h3>
+            <button class="x-btn" onclick="closeM('addequipo')">×</button>
+        </div>
+        <div style="padding:1.25rem" class="abm-form">
+            <label class="gest-check">
+                <input type="checkbox" id="gest-check" checked onchange="toggleIpField()">
+                <span style="font-size:.85rem;color:var(--txt)">¿Es gestionable? <small style="color:var(--dim)">(tiene dirección IP)</small></span>
+            </label>
+            <label>Categoría de Equipo:</label>
+            <input type="text" id="ae-cat" list="dl-cat" placeholder="Ej: ENERGIA, TRANSMISION...">
+            <label>Modelo de Equipo:</label>
+            <input type="text" id="ae-equipo" list="dl-equipo" placeholder="Ej: NOKIA, HUAWEI...">
+            <label>Etiqueta / Nombre:</label>
+            <input type="text" id="ae-etiqueta" list="dl-etiqueta" placeholder="Ej: REC01, BBU02...">
+            <div id="ae-ip-wrap">
+                <label>Dirección IP:</label>
+                <input type="text" id="ae-ip" placeholder="192.168.x.x">
+            </div>
+            <button onclick="guardarEquipo()" style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:13px;width:100%;font-weight:900;font-size:.9rem;cursor:pointer;margin-top:6px">💾 GUARDAR EQUIPO</button>
+        </div>
+    </div>
+</div>
+
+<datalist id="dl-cat"></datalist>
+<datalist id="dl-equipo"></datalist>
+<datalist id="dl-etiqueta"></datalist>
+
 
 <div id="toast"></div>
 
@@ -350,8 +480,9 @@ const DB = {
     auditList:[], 
     missing:[], 
     sem: 1,
-    currentSite: null,
-    rawHeaders: [] // Para reconstruir el Excel al exportar
+    cat: {}, // site -> category (A/B/C)
+    equip: {}, // site -> array of equipment objects
+
 };
 const QUARTERLY = ["ME00015", "ME00020", "ME00201", "ME00205"];
 let shortcuts = JSON.parse(localStorage.getItem('sc_v1') || '[]');
@@ -377,9 +508,16 @@ function initStorage() {
                     DB.s = data.s || { wos:{}, seteo:{}, all:[] };
                     DB.a = data.a || {};
                     DB.rawHeaders = data.rawHeaders || [];
+                    DB.rawGestiones = data.rawGestiones || null;
+                    DB.rawGestionesHeaders = data.rawGestionesHeaders || null;
                     if (DB.p.length) setpill('p', 'Excel Recuperado');
                     if (DB.s.all?.length) setpill('s', 'Sytex Recuperado');
                     if (Object.keys(DB.a).length) setpill('a', 'Alarms Recuperado');
+                    if (DB.rawGestiones && DB.rawGestionesHeaders) {
+                        parseGestiones(DB.rawGestiones, DB.rawGestionesHeaders);
+                        setpill('g', 'Gestiones Recuperado');
+                    }
+                    
                     renderAll();
                     checkMissing();
                     document.getElementById('export-btn').style.display = DB.p.length ? 'block' : 'none';
@@ -399,7 +537,9 @@ function saveToStorage() {
             p: DB.p,
             s: DB.s,
             a: DB.a,
-            rawHeaders: DB.rawHeaders
+            rawHeaders: DB.rawHeaders,
+            rawGestiones: DB.rawGestiones,
+            rawGestionesHeaders: DB.rawGestionesHeaders
         }, "main_data");
     };
 }
@@ -480,40 +620,321 @@ async function loadAlarms(input) {
     try {
         const f = input.files[0]; if(!f) return;
         const txt = await f.text();
-        // Intentar separar por punto y coma o coma según el CSV
         const delimiter = txt.includes(';') ? ';' : ',';
         const rows = txt.split('\n').map(r => r.split(delimiter));
         const headers = rows[0].map(h => h.toUpperCase().replace(/["\r]/g,'').trim());
         
         const iSITE = headers.findIndex(h => h.includes("SITIO") || h.includes("SITE"));
-        const iTECH = headers.findIndex(h => h.includes("TECNOLOG") || h.includes("TECH"));
         const iALM  = headers.findIndex(h => h.includes("ALARMA") || h.includes("NAME"));
-        const iPRT  = headers.findIndex(h => h.includes("PUERTO") || h.includes("PORT"));
-
+        
         DB.a = {};
         rows.slice(1).forEach(r => {
             if (r.length < 3) return;
             const siteRaw = String(r[iSITE]||'').replace(/"/g,'').trim();
-            if (!siteRaw || siteRaw === "." || siteRaw === "SITIO") return;
+            if (!siteRaw) return;
             
             const digits = siteRaw.toUpperCase().replace(/^ME/,'').replace(/^0+/,'') || '0';
             const site = `ME${digits.padStart(5, '0')}`;
-            const tech = String(r[iTECH]||'').replace(/"/g,'').trim();
             const alm  = String(r[iALM]||'').replace(/"/g,'').trim();
-            const prt  = String(r[iPRT]||'').replace(/"/g,'').trim();
+            
+            if (!alm || alm === "." || alm === "-") return;
             
             if (!DB.a[site]) DB.a[site] = [];
-            DB.a[site].push({ tech, alm, prt, id: `${tech}_${alm}_${prt}` });
+            DB.a[site].push({ alm, time: new Date().toISOString() });
         });
         
-        setpill('a','Alarms OK');
-        saveToStorage();
+        setpill('a','CSV OK');
+        renderAll();
         toast(`Alarmas cargadas: ${f.name}`);
-        if (DB.currentSite) showSite(DB.currentSite);
     } catch (err) {
-        console.error(err);
-        toast('Error cargando alarmas CSV');
+        toast('Error cargando CSV');
     }
+}
+
+function openM(id) { 
+    const el = document.getElementById('modal-' + id);
+    if (el) el.style.display = 'flex';
+}
+
+function closeM(id) { 
+    const el = document.getElementById('modal-' + id);
+    if (el) el.style.display = 'none';
+}
+
+// 📡 KIBANA LIVE INTEGRATION
+let kibanaAlarms = [];
+let sortCol = 'time';
+let sortDesc = true;
+
+async function fetchKibana() {
+    console.log("Iniciando fetchKibana...");
+    const btn = document.getElementById('kibana-btn');
+    const oldText = btn.textContent;
+    btn.textContent = "⏳ CONSULTANDO...";
+    btn.disabled = true;
+
+    const auth = btoa('noc-user:noc-user');
+    const url = 'http://chancani.claro.amx:9200/availability_cops_alarms/_search';
+    
+    const query = {
+        "size": 500,
+        "sort": [{"alarm.nbiAlarmTime": {"order": "desc"}}],
+        "query": {
+            "bool": {
+                "filter": [
+                    {"bool": {"minimum_should_match": 1, "should": [
+                        {"match_phrase": {"general.mr": "COMERCIAL"}},
+                        {"match_phrase": {"general.mr": "SIN ACEPTACION"}}
+                    ]}},
+                    {"match_phrase": {"location.region": "AR_MENDOZA"}}
+                ]
+            }
+        }
+    };
+
+    try {
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${auth}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(query)
+        });
+
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        
+        const data = await resp.json();
+        processKibanaHits(data.hits.hits);
+        document.getElementById('ma-manual-zone').style.display = 'none';
+        openM('alarms');
+
+    } catch (err) {
+        console.error("Error en fetchKibana:", err);
+        document.getElementById('ma-manual-zone').style.display = 'block';
+        // Limpiar tabla previa si falla
+        document.getElementById('ma-body').innerHTML = '<p style="text-align:center;padding:40px;color:var(--dim)">Error de conexión automática. Usa el cuadro de arriba para pegar el JSON de Kibana.</p>';
+        openM('alarms');
+        toast("Error de conexión (CORS). Usa la extensión o pega el JSON.");
+    } finally {
+        btn.textContent = oldText;
+        btn.disabled = false;
+    }
+}
+
+function processManualJson() {
+    const raw = document.getElementById('ma-json-input').value.trim();
+    if (!raw) return;
+    try {
+        let data = JSON.parse(raw);
+        // Si pegan el objeto completo de ES, extraemos hits
+        const hits = data.hits?.hits || (Array.isArray(data) ? data : null);
+        if (!hits) throw new Error("Formato inválido");
+        
+        processKibanaHits(hits);
+        toast("JSON procesado correctamente");
+    } catch (e) {
+        toast("Error: El contenido no es un JSON válido de Kibana");
+    }
+}
+
+function processKibanaHits(hits) {
+    // Categorización básica
+    const ENERGY_KWS = ["CORTE", "ENERGIA", "BATERIA", "BAT", "FALTA DE FASE", "RECTIFICADOR"];
+    const TX_KWS = ["RSSI", "ROE", "RX", "VSWR", "ANTENNA", "SIGNAL", "ORDER", "LINK", "TX", "MW"];
+
+    kibanaAlarms = hits.map(h => {
+        const s = h._source;
+        const text = s.alarm.nbiAdditionalText || '';
+        const tUp = text.toUpperCase();
+        
+        let cat = "EXTERNA";
+        if (TX_KWS.some(k => tUp.includes(k))) cat = "TX";
+        
+        const dGen = new Date(s.alarm.nbiAlarmTime);
+        const dIns = new Date(s.alarm.copsInsertedDate);
+        dGen.setHours(dGen.getHours() - 3);
+        dIns.setHours(dIns.getHours() - 3);
+
+        const latSec = (dIns - dGen) / 1000;
+        
+        return {
+            cat,
+            site: s.location.name,
+            time: dGen.toISOString(),
+            displayTime: dGen.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+            lat: latSec,
+            text: text.split('|')[0],
+            severity: s.alarm.nbiPerceivedSeverity || '—'
+        };
+    });
+
+    DB.a = {};
+    kibanaAlarms.forEach(a => {
+        if (!DB.a[a.site]) DB.a[a.site] = [];
+        DB.a[a.site].push({ alm: a.text, realTime: true });
+    });
+
+    setpill('a', 'KIBANA LIVE');
+    renderAlarmsModal();
+    renderAll();
+}
+
+function sortAlarms(col) {
+    if (sortCol === col) sortDesc = !sortDesc;
+    else { sortCol = col; sortDesc = true; }
+    
+    // Actualizar iconos de ordenamiento
+    ['cat','site','time','lat'].forEach(c => {
+        const el = document.getElementById('sort-' + c);
+        if (el) el.textContent = (c === sortCol) ? (sortDesc ? "▼" : "▲") : "";
+    });
+    
+    renderAlarmsModal();
+}
+
+function renderAlarmsModal() {
+    const body = document.getElementById('ma-body');
+    const filter = document.getElementById('ma-search')?.value.toUpperCase() || "";
+    
+    let filtered = kibanaAlarms.filter(a => 
+        a.site.toUpperCase().includes(filter) || 
+        a.text.toUpperCase().includes(filter) ||
+        a.cat.toUpperCase().includes(filter)
+    );
+
+    // Sort logic
+    filtered.sort((a, b) => {
+        let valA = a[sortCol], valB = b[sortCol];
+        if (typeof valA === 'string') valA = valA.toUpperCase();
+        if (typeof valB === 'string') valB = valB.toUpperCase();
+        
+        if (valA < valB) return sortDesc ? 1 : -1;
+        if (valA > valB) return sortDesc ? -1 : 1;
+        return 0;
+    });
+
+    body.innerHTML = filtered.map(a => `
+        <div style="display:grid; grid-template-columns: 100px 120px 100px 90px 1fr; padding:10px 20px; border-bottom:1px solid rgba(255,255,255,0.03); font-size:.75rem; align-items:center; background:${a.lat > 120 ? 'rgba(243,156,18,0.05)' : 'transparent'}">
+            <div style="color:${a.cat==='TX'?'#4f8ef7':'#ff6b6b'}; font-weight:800">[${a.cat}]</div>
+            <div style="color:var(--acc); font-weight:800">${a.site}</div>
+            <div style="color:var(--dim)">${a.displayTime}</div>
+            <div style="color:${a.lat > 120 ? 'var(--yellow)' : 'var(--dim)'}; font-weight:bold">${formatLat(a.lat)}</div>
+            <div style="color:var(--txt); overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${a.text}">${a.text}</div>
+        </div>
+    `).join('');
+
+    document.getElementById('ma-status').textContent = `Mostrando ${filtered.length} alarmas activas`;
+}
+
+function formatLat(sec) {
+    if (sec < 60) return sec + "s";
+    return Math.floor(sec/60) + "m";
+}
+
+// Escuchar búsqueda en el modal
+document.addEventListener('input', e => {
+    if (e.target.id === 'ma-search') renderAlarmsModal();
+});
+
+// Auto-refresh cada 2 minutos si no se ha cerrado la web
+setInterval(() => {
+    if (document.visibilityState === 'visible' && kibanaAlarms.length > 0) {
+        fetchKibana();
+    }
+}, 120000);
+
+// ──────────────────────────────────────────────
+// GESTIONES (CATEGORÍAS Y EQUIPOS)
+// ──────────────────────────────────────────────
+async function loadGestiones(input) {
+    try {
+        const f = input.files[0]; if(!f) return;
+        const b = await f.arrayBuffer();
+        const wb = XLSX.read(b);
+        
+        let sheetName = wb.SheetNames[0];
+        if (wb.SheetNames.includes("JP GONZALEZ")) {
+            sheetName = "JP GONZALEZ";
+        }
+        
+        const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header:1 });
+        const headers = data[0] ? data[0].map(h => String(h||'').toUpperCase()) : [];
+        
+        DB.rawGestiones = data;
+        DB.rawGestionesHeaders = headers;
+        
+        parseGestiones(data, headers);
+        
+        setpill('g','Gestiones OK');
+        saveToStorage();
+        toast(`Gestiones cargadas: ${f.name}`);
+        if (DB.currentSite) showSite(DB.currentSite);
+    } catch(err) {
+        console.error(err);
+        toast(`Error GESTIONES: ${err.message || err}`);
+    }
+}
+
+function parseGestiones(data, headers) {
+    let iSITE = 1, iCAT = 2, iCATEQ = 3, iEQ = 4, iETIQ = 5, iIP = 6;
+    if (headers.length > 0) {
+        const fSITE = headers.findIndex(h => h.includes('SITIO') || h.includes('ME'));
+        if(fSITE !== -1) iSITE = fSITE;
+        
+        const fCAT = headers.findIndex(h => h === 'A/B/C' || h === 'CATEGORIA SITIO' || h === 'CATEGORIA');
+        if(fCAT !== -1) iCAT = fCAT;
+        
+        const fCATEQ = headers.findIndex((h, idx) => idx > iCAT && (h.includes('CATEGORIA') || h.includes('CAT ')));
+        if(fCATEQ !== -1) iCATEQ = fCATEQ;
+        
+        const fEQ = headers.findIndex(h => h.includes('EQUIPO') || h.includes('MODELO'));
+        if(fEQ !== -1) iEQ = fEQ;
+        
+        const fETIQ = headers.findIndex(h => h.includes('ETIQUETA') || h.includes('NOMBRE'));
+        if(fETIQ !== -1) iETIQ = fETIQ;
+        
+        const fIP = headers.findIndex(h => h === 'IP' || h.includes('DIRECCION IP'));
+        if(fIP !== -1) iIP = fIP;
+    }
+
+    DB.cat = {};
+    DB.equip = {};
+    let uEq = new Set(), uEtiq = new Set();
+    
+    data.slice(1).forEach(r => {
+        if (!r) return;
+        const siteRaw = String(r[iSITE]||'').replace(/"/g,'').trim();
+        if (!siteRaw || siteRaw === 'undefined') return;
+        
+        const match = siteRaw.match(/\d+/);
+        const digits = match ? match[0] : '0';
+        const site = `ME${digits.padStart(5,'0')}`;
+        
+        if (r[iCAT]) {
+            const cat = String(r[iCAT]).toUpperCase().trim();
+            DB.cat[site] = cat;
+        }
+        
+        if (r[iEQ]) {
+            const equip = {
+                catEq: String(r[iCATEQ]||'').trim(),
+                modelo: String(r[iEQ]||'').trim(),
+                etiqueta: String(r[iETIQ]||'').trim(),
+                ip: String(r[iIP]||'').trim()
+            };
+            if(equip.modelo) uEq.add(equip.modelo);
+            if(equip.etiqueta) uEtiq.add(equip.etiqueta);
+
+            if (!DB.equip[site]) DB.equip[site] = [];
+            DB.equip[site].push(equip);
+        }
+    });
+
+    const dlEq = document.getElementById('dl-equipo');
+    const dlEtiq = document.getElementById('dl-etiqueta');
+    if (dlEq) dlEq.innerHTML = [...uEq].sort().map(x => `<option value="${x}">`).join('');
+    if (dlEtiq) dlEtiq.innerHTML = [...uEtiq].sort().map(x => `<option value="${x}">`).join('');
 }
 
 async function loadFile(input, type) {
@@ -601,7 +1022,23 @@ async function loadFile(input, type) {
 
 function setpill(id, txt) {
     const el = document.getElementById(id+'-pill');
-    el.innerText = txt; el.classList.add('ok');
+    if (el) {
+        el.innerText = txt; 
+        el.classList.add('ok');
+    }
+    
+    const lbl = document.getElementById('lbl-' + id);
+    const txtEl = document.getElementById('txt-' + id);
+    if (lbl && txtEl) {
+        lbl.style.borderColor = 'var(--green)';
+        lbl.style.color = 'var(--green)';
+        lbl.style.borderStyle = 'solid';
+        lbl.style.background = 'rgba(46, 204, 113, 0.08)';
+        
+        let oldText = txtEl.innerText;
+        oldText = oldText.replace(/^(📁|📊|🚨|🗂️|✅)\s*/, '');
+        txtEl.innerText = '✅ ' + oldText;
+    }
 }
 
 // ──────────────────────────────────────────────
@@ -805,10 +1242,29 @@ function showSite(cid) {
     document.getElementById('site-hdr').style.display='block';
     document.getElementById('s-id').innerText = cid;
 
+    const digits = cid.replace(/^ME/i,'').replace(/^0+/,'') || '0';
+    const siteNorm = `ME${digits.padStart(5, '0')}`;
+
+    // --- Categoria Badge ---
+    const catBadge = document.getElementById('s-cat-badge');
+    const cat = DB.cat && DB.cat[siteNorm];
+    if (cat) {
+        catBadge.innerText = cat;
+        catBadge.style.display = 'inline-block';
+    } else {
+        catBadge.style.display = 'none';
+    }
+
+    // --- ABM Button ---
+    const abmBtn = document.getElementById('s-abm-btn');
+    if (DB.equip && Object.keys(DB.equip).length > 0) {
+        abmBtn.style.display = 'inline-block';
+    } else {
+        abmBtn.style.display = 'none';
+    }
+
     // Alertas/Alarms badge
     const alBtn = document.getElementById('s-alarm-btn');
-    const digits = cid.replace(/^ME/,'').replace(/^0+/,'') || '0';
-    const siteNorm = `ME${digits.padStart(5, '0')}`;
     const siteAlarms = DB.a[siteNorm] || [];
     
     if (siteAlarms.length > 0) {
@@ -982,24 +1438,55 @@ function openAlarmsModal() {
     const cid = DB.currentSite;
     const digits = cid.replace(/^ME/,'').replace(/^0+/,'') || '0';
     const siteNorm = `ME${digits.padStart(5, '0')}`;
-    const alms = DB.a[siteNorm] || [];
+    let alms = [...(DB.a[siteNorm] || [])];
     
-    document.getElementById('ma-site').innerText = `${cid} — ${alms.length} alarmas configuradas`;
+    // 1. Obtener la tecnología (nombre largo) del primer registro que lo tenga
+    const mainTech = alms.find(a => a.tech && a.tech !== "-")?.tech || "";
+    
+    // 2. Ordenar alarmas por puerto (numérico)
+    alms.sort((a, b) => {
+        const pA = parseInt(a.prt) || 0;
+        const pB = parseInt(b.prt) || 0;
+        return pA - pB;
+    });
+
+    // 3. Actualizar el encabezado con la tecnología en amarillo
+    document.getElementById('ma-site').innerHTML = `
+        <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap">
+            <span>${cid} — ${alms.length} alarmas</span>
+            ${mainTech ? `<b style="color:var(--yellow); font-size:1.15rem; letter-spacing:0.5px">${mainTech}</b>` : ''}
+        </div>
+    `;
+
     const cont = document.getElementById('ma-body');
     cont.innerHTML = '';
     
     const checks = DB.aChecks[siteNorm] || {};
-    
-    alms.forEach(a => {
+    let lastPort = 0;
+
+    alms.forEach((a, index) => {
         const row = document.createElement('div');
         row.className = 'alarm-check-row';
+        
+        const currentPort = parseInt(a.prt) || 0;
+        // Detectar si hay un salto en la numeración (ej: de 6 pasa a 8)
+        const isJump = (index > 0 && currentPort !== lastPort + 1);
+        lastPort = currentPort;
+
+        if (isJump) {
+            row.style.backgroundColor = 'rgba(243, 156, 18, 0.15)';
+            row.style.borderLeft = '4px solid var(--yellow)';
+        }
+
         const isChecked = checks[a.id] || false;
         
         row.innerHTML = `
             <input type="checkbox" ${isChecked ? 'checked' : ''}>
             <div class="alarm-info">
                 <b>${a.alm}</b>
-                <small>${a.tech} | Puerto: ${a.prt}</small>
+                <small style="font-size:0.85rem; font-weight:900; color:var(--acc)">
+                    PUERTO: <span style="font-size:1.1rem; margin-left:3px">${a.prt}</span>
+                </small>
             </div>
         `;
         
@@ -1017,6 +1504,92 @@ function openAlarmsModal() {
     
     document.getElementById('modal-alarms').style.display = 'flex';
 }
+
+// ──────────────────────────────────────────────
+// ABM MODALS
+// ──────────────────────────────────────────────
+function renderAbmTable(site) {
+    const body = document.getElementById('abm-body');
+    body.innerHTML = '';
+    const list = DB.equip[site] || [];
+    if (!list.length) {
+        document.getElementById('abm-empty').style.display = 'block';
+        return;
+    }
+    document.getElementById('abm-empty').style.display = 'none';
+    list.forEach(eq => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>-</td><td>${eq.modelo || ''}</td><td>${eq.etiqueta || ''}</td><td>${eq.ip || 'No'}</td><td>${eq.ip ? 'Gestionable' : 'No gestionable'}</td>`;
+        body.appendChild(tr);
+    });
+}
+
+function openAbmModal() {
+    const site = DB.currentSite;
+    if (!site) return;
+    document.getElementById('abm-title').innerText = `📋 Equipos de ${site}`;
+    renderAbmTable(site);
+    document.getElementById('modal-abm').style.display = 'flex';
+}
+
+function toggleIpField() {
+    const checked = document.getElementById('gest-check').checked;
+    document.getElementById('ae-ip-wrap').style.display = checked ? 'block' : 'none';
+}
+
+function openAddEquipoDialog() {
+    document.getElementById('ae-cat').value = '';
+    document.getElementById('ae-equipo').value = '';
+    document.getElementById('ae-etiqueta').value = '';
+    document.getElementById('ae-ip').value = '';
+    document.getElementById('gest-check').checked = true;
+    toggleIpField();
+    document.getElementById('modal-addequipo').style.display = 'flex';
+}
+
+function guardarEquipo() {
+    const site = DB.currentSite;
+    if (!site) return;
+    const cat = document.getElementById('ae-cat').value.trim();
+    const modelo = document.getElementById('ae-equipo').value.trim();
+    const etiqueta = document.getElementById('ae-etiqueta').value.trim();
+    const gestionable = document.getElementById('gest-check').checked;
+    const ip = gestionable ? document.getElementById('ae-ip').value.trim() : '';
+    
+    if (!modelo || !etiqueta) { toast('Completar modelo y etiqueta'); return; }
+    
+    const digits = site.replace(/^ME/i,'').replace(/^0+/,'') || '0';
+    const siteNorm = `ME${digits.padStart(5, '0')}`;
+    const catSite = DB.cat[siteNorm] || "";
+
+    const nuevo = { catEq: cat, modelo, etiqueta, ip };
+    if (!DB.equip[siteNorm]) DB.equip[siteNorm] = [];
+    DB.equip[siteNorm].push(nuevo);
+    
+    if (DB.rawGestiones && DB.rawGestionesHeaders) {
+        const newRow = Array(DB.rawGestionesHeaders.length).fill("");
+        const h = DB.rawGestionesHeaders;
+        const iSITE = h.findIndex(x => x.includes('SITIO') || x.includes('SITE') || x.includes('ME'));
+        const iCAT  = h.findIndex(x => x.includes('CATEG') || x.includes('CATEGORY') || x === 'A/B/C' || x.includes('TIPO DE SITIO'));
+        const iEQ   = h.findIndex(x => x.includes('EQUIPO') || x.includes('MODEL'));
+        const iETIQ = h.findIndex(x => x.includes('ETIQUETA') || x.includes('LABEL'));
+        const iIP   = h.findIndex(x => x.includes('IP'));
+
+        if(iSITE !== -1) newRow[iSITE] = siteNorm;
+        if(iCAT !== -1) newRow[iCAT] = catSite;
+        if(iEQ !== -1) newRow[iEQ] = modelo;
+        if(iETIQ !== -1) newRow[iETIQ] = etiqueta;
+        if(iIP !== -1) newRow[iIP] = ip;
+        
+        DB.rawGestiones.push(newRow);
+        saveToStorage();
+    }
+    
+    closeM('addequipo');
+    openAbmModal();
+    toast('Equipo agregado y guardado');
+}
+
 function renderShortcuts() {
     const cont = document.getElementById('sc-list');
     if(!shortcuts.length) { cont.innerHTML='<p style="font-size:.75rem;color:var(--dim)">Sin accesos guardados.</p>'; return; }
@@ -1039,6 +1612,7 @@ function saveShortcut() {
     document.getElementById('sc-name').value='';
     document.getElementById('sc-url').value='';
     renderShortcuts();
+    closeM('sc');
     toast(`Acceso guardado: ${name}`);
 }
 
@@ -1053,7 +1627,14 @@ function openScModal() { document.getElementById('modal-sc').style.display='flex
 // ──────────────────────────────────────────────
 // UTILS
 // ──────────────────────────────────────────────
-function closeM(id) { document.getElementById('modal-'+id).style.display='none'; }
+function openM(id) { 
+    const el = document.getElementById('modal-' + id);
+    if (el) el.style.display = 'flex';
+}
+function closeM(id) { 
+    const el = document.getElementById('modal-' + id);
+    if (el) el.style.display = 'none';
+}
 window.onclick = e => { if(e.target.classList.contains('modal')) e.target.style.display='none'; };
 
 function toast(m) {
@@ -1098,6 +1679,18 @@ function exportExcel() {
     
     XLSX.writeFile(wb, "PREVENTIVOS_EDITADO.xlsx");
     toast("Excel descargado. Reemplaza el original con este.");
+}
+
+function exportGestiones() {
+    if (!DB.rawGestiones) {
+        toast("No hay gestiones cargadas para exportar.");
+        return;
+    }
+    const ws = XLSX.utils.aoa_to_sheet(DB.rawGestiones);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "JP GONZALEZ");
+    XLSX.writeFile(wb, "GESTIONES_EDITADO.xlsx");
+    toast("Gestiones descargadas.");
 }
 
 // Init storage and load data
